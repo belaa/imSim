@@ -153,24 +153,27 @@ class ESOSkyModel(NoiseAndBackgroundBase):
         c = conn.cursor()
         c.execute("SELECT obsHistID, moonPhase, dist2Moon, moonAlt FROM ObsHistory WHERE airmass>0")
         rows = c.fetchall()
-	
-	print(rows[7177])
+
+	 obsid = 7177	
+	 print(rows[obsid])
 
         gen = ObservationMetaDataGenerator(database=obs_db, driver='sqlite')
-        obs_md = gen.getObservationMetaData(obsHistID=rows[7177][0], boundLength=3)[0]
+        obs_md = gen.getObservationMetaData(obsHistID=rows[obsid][0], boundLength=3)[0]
 
         name_list, center_x, center_y = get_chip_names_centers()
         lsst_camera = LsstSimMapper().camera
-	n_chips = len(center_x)	
 
-        ra, dec = np.empty(n_chips, dtype=float), np.empty(n_chips, dtype=float)
+	chip_num = 70
+	# print(center_x[chip_num], center_y[chip_num])
+	
+	xpix = np.linspace(center_x[chip_num]-1999, center_x[chip_num]+1999, 1999)
+	ypix = np.linspace(center_y[chip_num]-1999, center_y[chip_num]+1999, 1999)
+	x_grid, y_grid = np.meshgrid(xpix, ypix)
 
-        ct_chip = list(4 * np.arange(0, n_chips, 1))
-        name_list = np.asarray(name_list)[ct_chip]
-        ra, dec = lsst.sims.coordUtils.raDecFromPixelCoords(xPix=center_x,
-                    yPix=center_y, chipName=name_list, camera=lsst_camera, 
-                    obs_metadata=obs_md, epoch=2000.0, includeDistortion=True)
-
+	chip_idx = chip_num * 4
+	ra, dec = lsst.sims.coordUtils.raDecFromPixelCoords(xPix=x_grid.flatten(), yPix=y_grid.flatten(), 
+		chipName=name_list[chip_idx], camera=lsst_camera, obs_metadata=obs_md, epoch=2000.0, includeDistortion=True)
+	
 
         bandPassName = 'r' # should be getting from obs_md, but obs_md returns y-band
         mjd = obs_md.mjd.TAI
@@ -197,65 +200,6 @@ class ESOSkyModel(NoiseAndBackgroundBase):
         skyCounts = skyCountsPerSec(surface_brightness=skyMagnitude,
                                     filter_band=bandPassName)*exposureTime
 	
-	type(skyCounts)
-	print(skyCounts)
-        #plt.figure(figsize=(10,7))
-        #plt.scatter(ra, dec, c=skyCounts, s=150)
-	#plt.colorbar().set_label('Mean sky level per chip (elec/30s)')
-	#plt.xlabel('RA (deg)')
-	#plt.ylabel('DEC (deg)')
-        #plt.show()
-
-	'''
-        # print "Magnitude:", skyMagnitude
-        print "Brightness:", skyMagnitude, skyCounts
-
-        image = image.copy()
-
-        if self.addBackground:
-            #### REMOVED
-            #image += skyCounts
-            ####
-
-
-            #### ADDED
-            image = image.array
-
-            n_subpix = 22
-
-            k = 0
-            for i in range(int(np.sqrt(n_chips))):
-                it = i*n_subpix
-                for j in range(int(np.sqrt(n_chips))):
-                    jt = j*n_subpix
-                    image[it:it+n_subpix, jt:jt+n_subpix] = skyCounts[k]
-                    k += 1 
-            ####
-
-            # if we are adding the skyCounts to the image,there is no need # to pass
-            # a skyLevel parameter to the noise model.  skyLevel is # just used to
-            # calculate the level of Poisson noise.  If the # sky background is
-            # included in the image, the Poisson noise # will be calculated from the
-            # actual image brightness.
-            skyLevel = 0.0
-
-        else:
-            skyLevel = skyCounts*photParams.gain
-
-
-        if self.addNoise:
-            #### ADDED
-            back_image = galsim.image.Image(image)
-            noiseModel = self.getNoiseModel(skyLevel=skyLevel, photParams=None)
-            back_image.addNoise(noiseModel)
-            image = back_image
-            ####
-
-            #### REMOVED
-            #noiseModel = self.getNoiseModel(skyLevel=skyLevel, photParams=photParams)
-            #image.addNoise(noiseModel)
-            ####
-	'''
 
         return ra, dec, skyCounts
 
